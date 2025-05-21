@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ziglang.vscode-zig",
+    "vadimcn.vscode-lldb",
+    "ms-vscode.hexeditor",
+    "esbenp.prettier-vscode",
+    "editorconfig.editorconfig",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
