@@ -2,6 +2,28 @@ const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
+/// Finds a root of unity with the given order n (i.e. an nth root of unity) in
+/// the given prime modulus m.
+/// Note that the modulus MUST be prime.
+pub fn findRootOfUnity(allocator: Allocator, n: i32, m: i32) !i32 {
+    // Ensure that order n | m - 1.
+    if (@mod(m - 1, n) != 0) {
+        return error.InvalidOrder;
+    }
+
+    const generator = try findPrimitiveRoot(allocator, m);
+
+    const base = generator;
+    const exponent = @divFloor(m - 1, n);
+
+    const result = try pow(base, exponent, m);
+    if (result == 1) {
+        return findRootOfUnity(allocator, n, m);
+    }
+
+    return result;
+}
+
 /// Finds a primitive root (a generator) in the given prime modulus.
 /// Note that the modulus MUST be prime.
 // See: https://cp-algorithms.com/algebra/primitive-root.html#implementation
@@ -100,6 +122,39 @@ pub fn pow(a: i32, b: i32, m: i32) !i32 {
     }
 
     return result;
+}
+
+test "findRootOfUnity - core" {
+    var n: i32 = undefined;
+    var m: i32 = undefined;
+    var expected: i32 = undefined;
+    var result: i32 = undefined;
+
+    n = 2;
+    m = 5;
+    expected = 4;
+    result = try findRootOfUnity(testing.allocator, n, m);
+    try testing.expectEqual(expected, result);
+
+    n = 3;
+    m = 7;
+    expected = 2;
+    result = try findRootOfUnity(testing.allocator, n, m);
+
+    n = 5;
+    m = 11;
+    expected = 4;
+    result = try findRootOfUnity(testing.allocator, n, m);
+}
+
+test "findRootOfUnity - invalid order" {
+    const n: i32 = 3;
+    const m: i32 = 11;
+
+    const expected = error.InvalidOrder;
+    const result = findRootOfUnity(testing.allocator, n, m);
+
+    try testing.expectError(expected, result);
 }
 
 test "findPrimitiveRoot" {
