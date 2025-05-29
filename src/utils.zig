@@ -124,6 +124,50 @@ pub fn pow(a: i64, b: i64, m: i64) !i64 {
     return result;
 }
 
+/// Checks if a given number is (probably) prime using the Miller-Rabin
+/// primality test algorithm.
+pub fn isPrime(number: i64, trials: usize) !bool {
+    if (number < 4) {
+        return number == 2 or number == 3;
+    }
+
+    // Check if number is even.
+    if (@mod(number, 2) == 0) {
+        return false;
+    }
+
+    var exponent = number - 1;
+    while (@mod(exponent, 2) == 0) {
+        exponent = @divFloor(exponent, 2);
+    }
+
+    // See: https://zig.guide/standard-library/random-numbers/
+    var prng = std.Random.DefaultPrng.init(blk: {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    const rand = prng.random();
+
+    for (0..trials) |_| {
+        const rand_val: i64 = rand.intRangeAtMost(i64, 1, number - 1);
+        var new_exponent = exponent;
+
+        var power = try pow(rand_val, new_exponent, number);
+
+        while (new_exponent != number - 1 and power != 1 and power != number - 1) {
+            power = @mod((power * power), number);
+            new_exponent *= 2;
+        }
+
+        if (power != number - 1 and @mod(new_exponent, 2) == 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 test "findRootOfUnity - core" {
     var n: i64 = undefined;
     var m: i64 = undefined;
@@ -239,4 +283,58 @@ test "pow - b < -1" {
     const result = pow(a, b, m);
 
     try testing.expectError(error.InvalidExponent, result);
+}
+
+test "isPrime" {
+    var number: i64 = undefined;
+    var result: bool = undefined;
+    const trials: usize = 2_000;
+
+    number = 1;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 2;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
+
+    number = 3;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
+
+    number = 4;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 5;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
+
+    number = 6;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 7;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
+
+    number = 8;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 9;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 10;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(false, result);
+
+    number = 39877;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
+
+    number = 74903;
+    result = try isPrime(number, trials);
+    try testing.expectEqual(true, result);
 }
