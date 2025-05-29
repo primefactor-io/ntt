@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 /// Finds a root of unity with the given order n (i.e. an nth root of unity) in
 /// the given prime modulus m.
 /// Note that the modulus MUST be prime.
-pub fn findRootOfUnity(allocator: Allocator, n: i32, m: i32) !i32 {
+pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
     // Ensure that order n | m - 1.
     if (@mod(m - 1, n) != 0) {
         return error.InvalidOrder;
@@ -27,14 +27,14 @@ pub fn findRootOfUnity(allocator: Allocator, n: i32, m: i32) !i32 {
 /// Finds a primitive root (a generator) in the given prime modulus.
 /// Note that the modulus MUST be prime.
 // See: https://cp-algorithms.com/algebra/primitive-root.html#implementation
-pub fn findPrimitiveRoot(allocator: Allocator, m: i32) !i32 {
-    var fact = std.ArrayList(i32).init(allocator);
+pub fn findPrimitiveRoot(allocator: Allocator, m: i64) !i64 {
+    var fact = std.ArrayList(i64).init(allocator);
     defer fact.deinit();
 
     const phi = m - 1;
     var n = phi;
 
-    var i: i32 = 2;
+    var i: i64 = 2;
     while (i * i <= n) : (i += 1) {
         if (@mod(n, i) == 0) {
             try fact.append(i);
@@ -48,7 +48,7 @@ pub fn findPrimitiveRoot(allocator: Allocator, m: i32) !i32 {
         try fact.append(n);
     }
 
-    var result: i32 = 2;
+    var result: i64 = 2;
     while (result <= m) : (result += 1) {
         var ok = true;
 
@@ -71,7 +71,7 @@ pub fn findPrimitiveRoot(allocator: Allocator, m: i32) !i32 {
 }
 
 /// Returns (gcd, x, y) such that a * x + b * y = gcd = gcd(a, b).
-pub fn egcd(a: i32, b: i32) struct { gcd: i32, x: i32, y: i32 } {
+pub fn egcd(a: i64, b: i64) struct { gcd: i64, x: i64, y: i64 } {
     if (a == 0) {
         const gcd = b;
         const x = 0;
@@ -87,7 +87,7 @@ pub fn egcd(a: i32, b: i32) struct { gcd: i32, x: i32, y: i32 } {
 }
 
 /// Calculates x such that (x * a) % m == 1.
-pub fn modInv(a: i32, m: i32) !i32 {
+pub fn modInv(a: i64, m: i64) !i64 {
     const result = egcd(a, m);
     if (result.gcd != 1) {
         return error.InvalidGCD;
@@ -99,7 +99,7 @@ pub fn modInv(a: i32, m: i32) !i32 {
 /// Note that b can be either >= 0 or -1. If it's -1, then the modular
 /// multiplicative inverse is calculated.
 // See: https://cp-algorithms.com/algebra/primitive-root.html#implementation
-pub fn pow(a: i32, b: i32, m: i32) !i32 {
+pub fn pow(a: i64, b: i64, m: i64) !i64 {
     if (b == -1) {
         return modInv(a, m);
     } else if (b < -1) {
@@ -109,7 +109,7 @@ pub fn pow(a: i32, b: i32, m: i32) !i32 {
     var base = a;
     var exponent = b;
     const modulus = m;
-    var result: i32 = 1;
+    var result: i64 = 1;
 
     while (exponent != 0) {
         if (exponent & 1 == 1) {
@@ -125,10 +125,10 @@ pub fn pow(a: i32, b: i32, m: i32) !i32 {
 }
 
 test "findRootOfUnity - core" {
-    var n: i32 = undefined;
-    var m: i32 = undefined;
-    var expected: i32 = undefined;
-    var result: i32 = undefined;
+    var n: i64 = undefined;
+    var m: i64 = undefined;
+    var expected: i64 = undefined;
+    var result: i64 = undefined;
 
     n = 2;
     m = 5;
@@ -148,8 +148,8 @@ test "findRootOfUnity - core" {
 }
 
 test "findRootOfUnity - invalid order" {
-    const n: i32 = 3;
-    const m: i32 = 11;
+    const n: i64 = 3;
+    const m: i64 = 11;
 
     const expected = error.InvalidOrder;
     const result = findRootOfUnity(testing.allocator, n, m);
@@ -158,9 +158,9 @@ test "findRootOfUnity - invalid order" {
 }
 
 test "findPrimitiveRoot" {
-    var m: i32 = undefined;
-    var expected: i32 = undefined;
-    var result: i32 = undefined;
+    var m: i64 = undefined;
+    var expected: i64 = undefined;
+    var result: i64 = undefined;
 
     m = 5;
     expected = 2;
