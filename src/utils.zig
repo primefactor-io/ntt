@@ -4,8 +4,11 @@ const Allocator = std.mem.Allocator;
 
 /// Finds a root of unity with the given order n (i.e. an nth root of unity) in
 /// the given prime modulus m.
-/// Note that the modulus MUST be prime.
 pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
+    if (!try isPrime(m)) {
+        return error.NotPrime;
+    }
+
     // Ensure that order n | m - 1.
     if (@mod(m - 1, n) != 0) {
         return error.InvalidOrder;
@@ -25,9 +28,12 @@ pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
 }
 
 /// Finds a primitive root (a generator) in the given prime modulus.
-/// Note that the modulus MUST be prime.
 // See: https://cp-algorithms.com/algebra/primitive-root.html#implementation
 pub fn findPrimitiveRoot(allocator: Allocator, m: i64) !i64 {
+    if (!try isPrime(m)) {
+        return error.NotPrime;
+    }
+
     var fact = std.ArrayList(i64).init(allocator);
     defer fact.deinit();
 
@@ -126,7 +132,7 @@ pub fn pow(a: i64, b: i64, m: i64) !i64 {
 
 /// Checks if a given number is (probably) prime using the Miller-Rabin
 /// primality test algorithm.
-pub fn isPrime(number: i64, trials: usize) !bool {
+pub fn isPrime(number: i64) !bool {
     if (number < 4) {
         return number == 2 or number == 3;
     }
@@ -149,7 +155,8 @@ pub fn isPrime(number: i64, trials: usize) !bool {
     });
     const rand = prng.random();
 
-    for (0..trials) |_| {
+    // Perform 1_000 trials.
+    for (0..1_000) |_| {
         const rand_val: i64 = rand.intRangeAtMost(i64, 1, number - 1);
         var new_exponent = exponent;
 
@@ -201,7 +208,17 @@ test "findRootOfUnity - invalid order" {
     try testing.expectError(expected, result);
 }
 
-test "findPrimitiveRoot" {
+test "findRootOfUnity - m not prime" {
+    const n: i64 = 3;
+    const m: i64 = 10;
+
+    const expected = error.NotPrime;
+    const result = findRootOfUnity(testing.allocator, n, m);
+
+    try testing.expectError(expected, result);
+}
+
+test "findPrimitiveRoot - core" {
     var m: i64 = undefined;
     var expected: i64 = undefined;
     var result: i64 = undefined;
@@ -220,6 +237,15 @@ test "findPrimitiveRoot" {
     expected = 2;
     result = try findPrimitiveRoot(testing.allocator, m);
     try testing.expectEqual(expected, result);
+}
+
+test "findPrimitiveRoot - m not prime" {
+    const m = 10;
+
+    const expected = error.NotPrime;
+    const result = findPrimitiveRoot(testing.allocator, m);
+
+    try testing.expectError(expected, result);
 }
 
 test "egcd" {
@@ -288,53 +314,52 @@ test "pow - b < -1" {
 test "isPrime" {
     var number: i64 = undefined;
     var result: bool = undefined;
-    const trials: usize = 2_000;
 
     number = 1;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 2;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 
     number = 3;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 
     number = 4;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 5;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 
     number = 6;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 7;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 
     number = 8;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 9;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 10;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(false, result);
 
     number = 39877;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 
     number = 74903;
-    result = try isPrime(number, trials);
+    result = try isPrime(number);
     try testing.expectEqual(true, result);
 }
