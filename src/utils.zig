@@ -175,6 +175,16 @@ pub fn isPrime(number: i64) !bool {
     return true;
 }
 
+/// Checks if a given number is a power of two.
+// See: https://stackoverflow.com/a/600306
+pub fn isPowerOfTwo(number: i64) bool {
+    if (number <= 1) {
+        return false;
+    }
+
+    return number & (number - 1) == 0;
+}
+
 test "findRootOfUnity - core" {
     var n: i64 = undefined;
     var m: i64 = undefined;
@@ -362,4 +372,33 @@ test "isPrime" {
     number = 74903;
     result = try isPrime(number);
     try testing.expectEqual(true, result);
+}
+
+test "isPowerOfTwo" {
+    var number: i64 = undefined;
+    var result: bool = undefined;
+
+    number = 0;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(false, result);
+
+    number = 1;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(false, result);
+
+    number = 2;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(true, result);
+
+    number = 256;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(true, result);
+
+    number = 2048;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(true, result);
+
+    number = 1234;
+    result = isPowerOfTwo(number);
+    try testing.expectEqual(false, result);
 }
