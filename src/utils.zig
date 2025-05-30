@@ -225,77 +225,88 @@ pub fn bitReverseSlice(allocator: Allocator, numbers: []const i64) ![]const i64 
     return result;
 }
 
-test "findRootOfUnity - core" {
-    var n: i64 = undefined;
-    var m: i64 = undefined;
-    var expected: i64 = undefined;
-    var result: i64 = undefined;
+test "findRootOfUnity" {
+    {
+        const n = 2;
+        const m = 5;
+        const expected = 4;
 
-    n = 2;
-    m = 5;
-    expected = 4;
-    result = try findRootOfUnity(testing.allocator, n, m);
-    try testing.expectEqual(expected, result);
+        const result = try findRootOfUnity(testing.allocator, n, m);
+        try testing.expectEqual(expected, result);
+    }
 
-    n = 3;
-    m = 7;
-    expected = 2;
-    result = try findRootOfUnity(testing.allocator, n, m);
+    {
+        const n = 3;
+        const m = 7;
+        const expected = 2;
 
-    n = 5;
-    m = 11;
-    expected = 4;
-    result = try findRootOfUnity(testing.allocator, n, m);
+        const result = try findRootOfUnity(testing.allocator, n, m);
+        try testing.expectEqual(expected, result);
+    }
+
+    {
+        const n = 5;
+        const m = 11;
+        const expected = 4;
+
+        const result = try findRootOfUnity(testing.allocator, n, m);
+        try testing.expectEqual(expected, result);
+    }
+
+    {
+        const n: i64 = 3;
+        const m: i64 = 11;
+
+        const expected = error.InvalidOrder;
+        const result = findRootOfUnity(testing.allocator, n, m);
+
+        try testing.expectError(expected, result);
+    }
+
+    {
+        const n: i64 = 3;
+        const m: i64 = 10;
+
+        const expected = error.NotPrime;
+        const result = findRootOfUnity(testing.allocator, n, m);
+
+        try testing.expectError(expected, result);
+    }
 }
 
-test "findRootOfUnity - invalid order" {
-    const n: i64 = 3;
-    const m: i64 = 11;
+test "findPrimitiveRoot" {
+    {
+        const m = 5;
+        const expected = 2;
 
-    const expected = error.InvalidOrder;
-    const result = findRootOfUnity(testing.allocator, n, m);
+        const result = try findPrimitiveRoot(testing.allocator, m);
+        try testing.expectEqual(expected, result);
+    }
 
-    try testing.expectError(expected, result);
-}
+    {
+        const m = 7;
+        const expected = 3;
 
-test "findRootOfUnity - m not prime" {
-    const n: i64 = 3;
-    const m: i64 = 10;
+        const result = try findPrimitiveRoot(testing.allocator, m);
+        try testing.expectEqual(expected, result);
+    }
 
-    const expected = error.NotPrime;
-    const result = findRootOfUnity(testing.allocator, n, m);
+    {
+        const m = 11;
+        const expected = 2;
 
-    try testing.expectError(expected, result);
-}
+        const result = try findPrimitiveRoot(testing.allocator, m);
+        try testing.expectEqual(expected, result);
+    }
 
-test "findPrimitiveRoot - core" {
-    var m: i64 = undefined;
-    var expected: i64 = undefined;
-    var result: i64 = undefined;
+    {
+        const m = 10;
 
-    m = 5;
-    expected = 2;
-    result = try findPrimitiveRoot(testing.allocator, m);
-    try testing.expectEqual(expected, result);
+        const expected = error.NotPrime;
+        const result = findPrimitiveRoot(testing.allocator, m);
 
-    m = 7;
-    expected = 3;
-    result = try findPrimitiveRoot(testing.allocator, m);
-    try testing.expectEqual(expected, result);
-
-    m = 11;
-    expected = 2;
-    result = try findPrimitiveRoot(testing.allocator, m);
-    try testing.expectEqual(expected, result);
-}
-
-test "findPrimitiveRoot - m not prime" {
-    const m = 10;
-
-    const expected = error.NotPrime;
-    const result = findPrimitiveRoot(testing.allocator, m);
-
-    try testing.expectError(expected, result);
+        try testing.expectError(expected, result);
+    }
 }
 
 test "egcd" {
@@ -321,126 +332,158 @@ test "modInv" {
     try testing.expectEqual(23, result);
 }
 
-test "pow - b > 0" {
-    const a = 4;
-    const b = 3;
-    const m = 5;
+test "pow" {
+    {
+        const a = 4;
+        const b = 3;
+        const m = 5;
 
-    const result = try pow(a, b, m);
+        const result = try pow(a, b, m);
 
-    try testing.expectEqual(4, result);
-}
+        try testing.expectEqual(4, result);
+    }
 
-test "pow - b = 0" {
-    const a = 4;
-    const b = 0;
-    const m = 5;
+    {
+        const a = 4;
+        const b = 0;
+        const m = 5;
 
-    const result = try pow(a, b, m);
+        const result = try pow(a, b, m);
 
-    try testing.expectEqual(1, result);
-}
+        try testing.expectEqual(1, result);
+    }
 
-test "pow - b = -1" {
-    const a = 38;
-    const b = -1;
-    const m = 97;
+    {
+        const a = 38;
+        const b = -1;
+        const m = 97;
 
-    const result = try pow(a, b, m);
+        const result = try pow(a, b, m);
 
-    try testing.expectEqual(23, result);
-}
+        try testing.expectEqual(23, result);
+    }
 
-test "pow - b < -1" {
-    const a = 4;
-    const b = -2;
-    const m = 5;
+    {
+        const a = 4;
+        const b = -2;
+        const m = 5;
 
-    const result = pow(a, b, m);
+        const result = pow(a, b, m);
 
-    try testing.expectError(error.InvalidExponent, result);
+        try testing.expectError(error.InvalidExponent, result);
+    }
 }
 
 test "isPrime" {
-    var number: i64 = undefined;
-    var result: bool = undefined;
+    {
+        const number = 1;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 1;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 2;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 2;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 3;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 3;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 4;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 4;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 5;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 5;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 6;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 6;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 7;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 7;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 8;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 8;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 9;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 9;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 10;
+        const result = try isPrime(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 10;
-    result = try isPrime(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 39877;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 39877;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
-
-    number = 74903;
-    result = try isPrime(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 74903;
+        const result = try isPrime(number);
+        try testing.expectEqual(true, result);
+    }
 }
 
 test "isPowerOfTwo" {
-    var number: i64 = undefined;
-    var result: bool = undefined;
+    {
+        const number = 0;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 0;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 1;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(false, result);
+    }
 
-    number = 1;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 2;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 2;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 256;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 256;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(true, result);
+    {
+        const number = 2048;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(true, result);
+    }
 
-    number = 2048;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(true, result);
-
-    number = 1234;
-    result = isPowerOfTwo(number);
-    try testing.expectEqual(false, result);
+    {
+        const number = 1234;
+        const result = isPowerOfTwo(number);
+        try testing.expectEqual(false, result);
+    }
 }
 
 test "bitReverseNumber" {
