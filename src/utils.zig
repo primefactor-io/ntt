@@ -200,6 +200,31 @@ pub fn bitReverseNumber(number: i64, width: i64) i64 {
     return result;
 }
 
+/// Reorders numbers in slice using the bit reverse value of the slice indexes.
+/// The numbers [0, 1, 2, 3] would become [0, 2, 1, 3] because 0 = 0b00 reversed
+/// is 0b00 = 0, 1 = 0b01 reversed is 0b10 = 2, 2 = 0b10 reversed is 0b01 = 1
+/// and 3 = 0b11 reversed is 0b11 = 3.
+/// The caller owns the returned memory.
+pub fn bitReverseSlice(allocator: Allocator, numbers: []const i64) ![]const i64 {
+    // Length of numbers must be a power of 2.
+    if (!isPowerOfTwo(@intCast(numbers.len))) {
+        return error.LengthNotPowerOfTwo;
+    }
+
+    const n = numbers.len;
+    const log2_n = std.math.log2_int(usize, @intCast(n));
+
+    const result = try allocator.alloc(i64, n);
+
+    for (0..n) |i| {
+        const reversed_i = bitReverseNumber(@intCast(i), log2_n);
+        const idx: usize = @intCast(reversed_i);
+        result[i] = numbers[idx];
+    }
+
+    return result;
+}
+
 test "findRootOfUnity - core" {
     var n: i64 = undefined;
     var m: i64 = undefined;
@@ -452,5 +477,62 @@ test "bitReverseNumber" {
         const expected_2 = number; // 0b000001100100
         const result_2 = bitReverseNumber(number_2, width);
         try testing.expectEqual(expected_2, result_2);
+    }
+}
+
+test "bitReverseSlice" {
+    const allocator = testing.allocator;
+
+    {
+        const input = [_]i64{ 0, 1, 2, 3, 4, 5 };
+        const expected = error.LengthNotPowerOfTwo;
+
+        const result = bitReverseSlice(allocator, &input);
+        try testing.expectError(expected, result);
+    }
+
+    {
+        const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7 };
+        const expected = [_]i64{ 0, 4, 2, 6, 1, 5, 3, 7 };
+
+        const result = try bitReverseSlice(allocator, &input);
+        defer allocator.free(result);
+
+        try testing.expectEqualSlices(i64, &expected, result);
+    }
+
+    {
+        const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+        const expected = [_]i64{ 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 };
+
+        const result = try bitReverseSlice(allocator, &input);
+        defer allocator.free(result);
+
+        try testing.expectEqualSlices(i64, &expected, result);
+    }
+
+    {
+        const input = [_]i64{ 0, 1, 4, 5 };
+        const expected = [_]i64{ 0, 4, 1, 5 };
+
+        const result = try bitReverseSlice(allocator, &input);
+        defer allocator.free(result);
+
+        try testing.expectEqualSlices(i64, &expected, result);
+    }
+
+    {
+        const input = [_]i64{ 11, 22, 33, 44, 55, 66, 77, 88 };
+        const expected = input;
+
+        const input_1 = input;
+        const result_1 = try bitReverseSlice(allocator, &input_1);
+        defer allocator.free(result_1);
+
+        const input_2 = result_1;
+        const result_2 = try bitReverseSlice(allocator, input_2);
+        defer allocator.free(result_2);
+
+        try testing.expectEqualSlices(i64, &expected, result_2);
     }
 }
