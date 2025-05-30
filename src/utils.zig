@@ -185,6 +185,21 @@ pub fn isPowerOfTwo(number: i64) bool {
     return number & (number - 1) == 0;
 }
 
+/// Reverses the bits of the number using the specified bit width.
+/// The value 9 = 0b1001 with a desired width of 6 would be 0b001001 and its
+/// reverse would therefore be 0b100100 = 36.
+pub fn bitReverseNumber(number: i64, width: i64) i64 {
+    var x = number;
+    var result: i64 = 0;
+
+    for (0..@intCast(width)) |_| {
+        result = (result << 1) | (x & 1);
+        x >>= 1;
+    }
+
+    return result;
+}
+
 test "findRootOfUnity - core" {
     var n: i64 = undefined;
     var m: i64 = undefined;
@@ -401,4 +416,41 @@ test "isPowerOfTwo" {
     number = 1234;
     result = isPowerOfTwo(number);
     try testing.expectEqual(false, result);
+}
+
+test "bitReverseNumber" {
+    {
+        const number = 100; // 0b1100100
+        const width = 7;
+
+        const expected = 19; // 0b0010011
+        const result = bitReverseNumber(number, width);
+
+        try testing.expectEqual(expected, result);
+    }
+
+    {
+        const number = 100; // 0b0001100100
+        const width = 10;
+
+        const expected = 152; // 0b0010011000
+        const result = bitReverseNumber(number, width);
+
+        try testing.expectEqual(expected, result);
+    }
+
+    {
+        const number = 100;
+        const width = 12;
+
+        const number_1 = number; // 0b000001100100
+        const expected_1 = 608; // 0b001001100000
+        const result_1 = bitReverseNumber(number_1, width);
+        try testing.expectEqual(expected_1, result_1);
+
+        const number_2 = result_1; // 0b001001100000
+        const expected_2 = number; // 0b000001100100
+        const result_2 = bitReverseNumber(number_2, width);
+        try testing.expectEqual(expected_2, result_2);
+    }
 }
