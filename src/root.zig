@@ -3,6 +3,8 @@
 //! start with main.zig instead.
 const std = @import("std");
 const testing = std.testing;
+
+pub const ntt = @import("ntt.zig");
 pub const utils = @import("utils.zig");
 
 pub export fn add(a: i32, b: i32) i32 {
