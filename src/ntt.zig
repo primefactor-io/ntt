@@ -9,7 +9,7 @@ const utils = @import("utils.zig");
 /// where q is the coefficient modulus and n is the degree of the cyclotomic
 /// polynomial.
 /// The NTT algorithm is based on the paper "Low-Cost and Area-Efficient FPGA
-// Implementations of Lattice-Based Cryptography" by Aysu et al.
+/// Implementations of Lattice-Based Cryptography" by Aysu et al.
 // See: https://schaumont.dyn.wpi.edu/schaum/pdf/papers/2013hostb.pdf
 pub const NTT = struct {
     const Self = @This();
