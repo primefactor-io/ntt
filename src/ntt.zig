@@ -315,3 +315,34 @@ test "ntt - ntt" {
         try testing.expectError(expected, result);
     }
 }
+
+test "ntt - convolution" {
+    const allocator = testing.allocator;
+
+    {
+        const q = 7681;
+        const n = 4;
+
+        const ntt = try NTT.init(allocator, q, n);
+        defer ntt.deinit();
+
+        const coefficients_1 = [_]i64{ 1, 2, 3, 4 };
+        const coefficients_2 = [_]i64{ 5, 6, 7, 8 };
+
+        const fwd_1 = try ntt.fwd(&coefficients_1);
+        defer allocator.free(fwd_1);
+        const fwd_2 = try ntt.fwd(&coefficients_2);
+        defer allocator.free(fwd_2);
+
+        var interim = [_]i64{0} ** n;
+        for (0..n) |idx| {
+            interim[idx] = fwd_1[idx] * fwd_2[idx];
+        }
+
+        const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }
+        const result = try ntt.inv(&interim);
+        defer allocator.free(result);
+
+        try testing.expectEqualSlices(i64, &expected, result);
+    }
+}
