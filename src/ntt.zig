@@ -42,6 +42,7 @@ pub const NTT = struct {
         // Compute the inverse of the degree of the cyclotomic polynomial.
         const n_inverse = try utils.modInv(n, q);
 
+        // TODO: This can be done with only one loop.
         // Compute powers of psi.
         var powers = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
         defer powers.deinit();
@@ -125,7 +126,7 @@ pub const NTT = struct {
         }
 
         const log2_n = std.math.log2_int(usize, @intCast(self.n));
-        const reversed = try utils.bitReverseSlice(self.allocator, coefficients);
+        const reversed = try utils.bitReverseSlice(i64, self.allocator, coefficients);
         defer self.allocator.free(reversed);
 
         var result = try self.allocator.dupe(i64, reversed);
@@ -137,7 +138,7 @@ pub const NTT = struct {
 
             const in_1 = @as(usize, 1) << @intCast(i); // 2^i
             const in_2 = @as(usize, 1) << @intCast(i + 1); // 2^(i + 1)
-            const in_3 = @as(usize, @intCast(self.n)) / in_2; // n / (2^(i + 1))
+            const in_3 = @as(usize, @intCast(self.n)) / in_2; // n / 2^(i + 1)
 
             for (0..in_1) |j| {
                 for (0..in_3) |t| {
@@ -330,13 +331,13 @@ test "ntt - convolution" {
         const coefficients_2 = [_]i64{ 5, 6, 7, 8 };
 
         const fwd_1 = try ntt.fwd(&coefficients_1);
-        defer allocator.free(fwd_1);
         const fwd_2 = try ntt.fwd(&coefficients_2);
+        defer allocator.free(fwd_1);
         defer allocator.free(fwd_2);
 
         var interim = [_]i64{0} ** n;
-        for (0..n) |idx| {
-            interim[idx] = fwd_1[idx] * fwd_2[idx];
+        for (0..n) |i| {
+            interim[i] = fwd_1[i] * fwd_2[i];
         }
 
         const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }

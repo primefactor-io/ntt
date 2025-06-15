@@ -8,5 +8,6 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "debug.allowBreakpointsEverywhere": true,
   "zig.zls.enabled": "on",
+  "zig.zls.enableBuildOnSave": null,
   "zig.formattingProvider": "zls"
 }
