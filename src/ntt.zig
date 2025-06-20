@@ -42,25 +42,24 @@ pub const NTT = struct {
         // Compute the inverse of the degree of the cyclotomic polynomial.
         const n_inverse = try utils.modInv(n, q);
 
-        // Compute powers of psi.
+        // Compute powers of psi as well as powers of psi^-1.
         var powers = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
+        var powers_inverse = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
         defer powers.deinit();
+        defer powers_inverse.deinit();
+
         try powers.append(1);
+        try powers_inverse.append(1);
+
         for (1..@intCast(n)) |_| {
             const power = @mod(powers.getLast() * psi, q);
+            const power_inverse = @mod(powers_inverse.getLast() * psi_inverse, q);
             try powers.append(power);
+            try powers_inverse.append(power_inverse);
         }
-        const psi_powers = try powers.toOwnedSlice();
 
-        // Compute powers of psi^-1.
-        var inverse_powers = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
-        defer inverse_powers.deinit();
-        try inverse_powers.append(1);
-        for (1..@intCast(n)) |_| {
-            const power = @mod(inverse_powers.getLast() * psi_inverse, q);
-            try inverse_powers.append(power);
-        }
-        const psi_inverse_powers = try inverse_powers.toOwnedSlice();
+        const psi_powers = try powers.toOwnedSlice();
+        const psi_inverse_powers = try powers_inverse.toOwnedSlice();
 
         return NTT{
             .q = q,
