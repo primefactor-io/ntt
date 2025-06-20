@@ -115,7 +115,9 @@ pub const NTT = struct {
         return result;
     }
 
-    /// Runs an iterative version of NTT with the given coefficients and twiddles.
+    /// Runs an iterative version of NTT with the given coefficients and twiddles
+    /// which are the powers of the roots of unity (i.e. powers of psi / powers
+    /// of psi^-1).
     /// The caller owns the returned memory.
     fn ntt(self: Self, coefficients: []const i64, twiddles: []const i64) ![]const i64 {
         // Length of coefficients and twiddles must be the same.
@@ -130,31 +132,27 @@ pub const NTT = struct {
         var result = try self.allocator.dupe(i64, reversed);
 
         for (0..log2_n) |i| {
-            var temp_twiddle: i64 = 1;
-            var final_twiddle: i64 = 1;
-            const twiddle = twiddles[i + 1];
-
             const in_1 = @as(usize, 1) << @intCast(i); // 2^i
             const in_2 = @as(usize, 1) << @intCast(i + 1); // 2^(i + 1)
-            const in_3 = @as(usize, @intCast(self.n)) / in_2; // n / (2^(i + 1))
+            const in_3 = @as(usize, @intCast(self.n)) >> @intCast(i + 1); // n >> (i + 1) = n / 2^(i + 1)
 
             for (0..in_1) |j| {
                 for (0..in_3) |t| {
-                    const index_1 = (t * in_2) + j; // (t * 2^(i + 1)) + j
-                    const index_2 = index_1 + in_1; // (t * 2^(i + 1)) + j + 2^i
+                    const index_even = (t * in_2) + j; // (t * 2^(i + 1)) + j
+                    const index_odd = index_even + in_1; // (t * 2^(i + 1)) + j + 2^i
 
-                    const c = result[index_1];
-                    const d = result[index_2];
+                    const c = result[index_even];
+                    const d = result[index_odd];
 
-                    const butterfly_plus = @mod(c + (final_twiddle * d), self.q);
-                    const butterfly_minus = @mod(c - (final_twiddle * d), self.q);
+                    const twiddle_index = @as(usize, j) << @intCast(1 + log2_n - (i + 1)); // j << (1 + log2(n) - (i + 1))
+                    const twiddle_factor = @mod(twiddles[twiddle_index] * d, self.q);
 
-                    result[index_1] = butterfly_plus;
-                    result[index_2] = butterfly_minus;
+                    const butterfly_plus = @mod(c + twiddle_factor, self.q);
+                    const butterfly_minus = @mod(c - twiddle_factor, self.q);
 
-                    temp_twiddle = @mod(temp_twiddle * twiddle, self.q);
+                    result[index_even] = butterfly_plus;
+                    result[index_odd] = butterfly_minus;
                 }
-                final_twiddle = temp_twiddle;
             }
         }
 
