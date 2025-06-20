@@ -325,18 +325,29 @@ test "ntt - convolution" {
 
         const coefficients_1 = [_]i64{ 1, 2, 3, 4 };
         const coefficients_2 = [_]i64{ 5, 6, 7, 8 };
+        // Note that x^n + 1 = x^4 + 1 which means that x^4 = -1
+        //   (1 + 2x + 3x^2 + 4x^3) * (5 + 6x + 7x^2 + 8x^3)
+        // = 5 + 6x + 7x^2 + 8x^3 +
+        //   10x + 12x^2 + 14x^3 + 16x^4 +
+        //   15x^2 + 18x^3 + 21x^4 + 24x^5 +
+        //   20x^3 + 24x^4 + 28x^5 + 32x^6
+        // = 5 + 16x + 34x^2 + 60x^3 + 61x^4 + 52x^5 + 32x^6
+        // = 5 + 16x + 34x^2 + 60x^3 + 61(x^4) + x(52x^4) + x^2(32x^4)
+        // = 5 + 16x + 34x^2 + 60x^3 + (61 * -1) + x(52 * -1) + x^2(32 * -1)
+        // = 5 + 16x + 34x^2 + 60x^3 - 61 - 52x - 32x^2
+        // = -56 - 36x + 2x^2 + 60x^3
+        const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }
 
         const fwd_1 = try ntt.fwd(&coefficients_1);
-        defer allocator.free(fwd_1);
         const fwd_2 = try ntt.fwd(&coefficients_2);
+        defer allocator.free(fwd_1);
         defer allocator.free(fwd_2);
 
         var interim = [_]i64{0} ** n;
-        for (0..n) |idx| {
-            interim[idx] = fwd_1[idx] * fwd_2[idx];
+        for (0..n) |i| {
+            interim[i] = fwd_1[i] * fwd_2[i];
         }
 
-        const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }
         const result = try ntt.inv(&interim);
         defer allocator.free(result);
 
