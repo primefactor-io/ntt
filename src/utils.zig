@@ -205,7 +205,7 @@ pub fn bitReverseNumber(number: i64, width: i64) i64 {
 /// is 0b00 = 0, 1 = 0b01 reversed is 0b10 = 2, 2 = 0b10 reversed is 0b01 = 1
 /// and 3 = 0b11 reversed is 0b11 = 3.
 /// The caller owns the returned memory.
-pub fn bitReverseSlice(allocator: Allocator, numbers: []const i64) ![]const i64 {
+pub fn bitReverseSlice(comptime T: type, allocator: Allocator, numbers: []const T) ![]const T {
     // Length of numbers must be a power of 2.
     if (!isPowerOfTwo(@intCast(numbers.len))) {
         return error.LengthNotPowerOfTwo;
@@ -214,7 +214,7 @@ pub fn bitReverseSlice(allocator: Allocator, numbers: []const i64) ![]const i64 
     const n = numbers.len;
     const log2_n = std.math.log2_int(usize, @intCast(n));
 
-    const result = try allocator.alloc(i64, n);
+    const result = try allocator.alloc(T, n);
 
     for (0..n) |i| {
         const reversed_i = bitReverseNumber(@intCast(i), log2_n);
@@ -530,7 +530,7 @@ test "bitReverseSlice" {
         const input = [_]i64{ 0, 1, 2, 3, 4, 5 };
         const expected = error.LengthNotPowerOfTwo;
 
-        const result = bitReverseSlice(allocator, &input);
+        const result = bitReverseSlice(i64, allocator, &input);
         try testing.expectError(expected, result);
     }
 
@@ -538,7 +538,7 @@ test "bitReverseSlice" {
         const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7 };
         const expected = [_]i64{ 0, 4, 2, 6, 1, 5, 3, 7 };
 
-        const result = try bitReverseSlice(allocator, &input);
+        const result = try bitReverseSlice(i64, allocator, &input);
         defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
@@ -548,7 +548,7 @@ test "bitReverseSlice" {
         const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
         const expected = [_]i64{ 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 };
 
-        const result = try bitReverseSlice(allocator, &input);
+        const result = try bitReverseSlice(i64, allocator, &input);
         defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
@@ -558,7 +558,7 @@ test "bitReverseSlice" {
         const input = [_]i64{ 0, 1, 4, 5 };
         const expected = [_]i64{ 0, 4, 1, 5 };
 
-        const result = try bitReverseSlice(allocator, &input);
+        const result = try bitReverseSlice(i64, allocator, &input);
         defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
@@ -569,11 +569,11 @@ test "bitReverseSlice" {
         const expected = input;
 
         const input_1 = input;
-        const result_1 = try bitReverseSlice(allocator, &input_1);
+        const result_1 = try bitReverseSlice(i64, allocator, &input_1);
         defer allocator.free(result_1);
 
         const input_2 = result_1;
-        const result_2 = try bitReverseSlice(allocator, input_2);
+        const result_2 = try bitReverseSlice(i64, allocator, input_2);
         defer allocator.free(result_2);
 
         try testing.expectEqualSlices(i64, &expected, result_2);

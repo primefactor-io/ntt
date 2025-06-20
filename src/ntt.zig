@@ -126,7 +126,7 @@ pub const NTT = struct {
         }
 
         const log2_n = std.math.log2_int(usize, @intCast(self.n));
-        const reversed = try utils.bitReverseSlice(self.allocator, coefficients);
+        const reversed = try utils.bitReverseSlice(i64, self.allocator, coefficients);
         defer self.allocator.free(reversed);
 
         var result = try self.allocator.dupe(i64, reversed);
