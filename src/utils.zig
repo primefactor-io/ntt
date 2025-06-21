@@ -2,11 +2,11 @@
 
 const std = @import("std");
 const testing = std.testing;
-const Allocator = std.mem.Allocator;
+const Complex = std.math.Complex;
 
 /// Finds a root of unity with the given order n (i.e. an nth root of unity) in
 /// the given prime modulus m.
-pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
+pub fn findRootOfUnity(comptime n: i64, comptime m: i64) !i64 {
     if (!try isPrime(m)) {
         return error.NotPrime;
     }
@@ -16,14 +16,14 @@ pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
         return error.InvalidOrder;
     }
 
-    const generator = try findPrimitiveRoot(allocator, m);
+    const generator = try findPrimitiveRoot(m);
 
     const base = generator;
     const exponent = @divFloor(m - 1, n);
 
     const result = try pow(base, exponent, m);
     if (result == 1) {
-        return findRootOfUnity(allocator, n, m);
+        return findRootOfUnity(n, m);
     }
 
     return result;
@@ -31,13 +31,13 @@ pub fn findRootOfUnity(allocator: Allocator, n: i64, m: i64) !i64 {
 
 /// Finds a primitive root (a generator) in the given prime modulus.
 // See: https://cp-algorithms.com/algebra/primitive-root.html#implementation
-pub fn findPrimitiveRoot(allocator: Allocator, m: i64) !i64 {
+pub fn findPrimitiveRoot(comptime m: i64) !i64 {
     if (!try isPrime(m)) {
         return error.NotPrime;
     }
 
-    var fact = std.ArrayList(i64).init(allocator);
-    defer fact.deinit();
+    var index: usize = 0;
+    var fact = [_]i64{0} ** m;
 
     const phi = m - 1;
     var n = phi;
@@ -45,7 +45,9 @@ pub fn findPrimitiveRoot(allocator: Allocator, m: i64) !i64 {
     var i: i64 = 2;
     while (i * i <= n) : (i += 1) {
         if (@mod(n, i) == 0) {
-            try fact.append(i);
+            fact[index] = i;
+            index += 1;
+
             while (@mod(n, i) == 0) {
                 n = @divFloor(n, i);
             }
@@ -53,14 +55,15 @@ pub fn findPrimitiveRoot(allocator: Allocator, m: i64) !i64 {
     }
 
     if (n > 1) {
-        try fact.append(n);
+        fact[index] = n;
+        index += 1;
     }
 
     var result: i64 = 2;
     while (result <= m) : (result += 1) {
         var ok = true;
 
-        for (fact.items) |f| {
+        for (fact[0..index]) |f| {
             const base = result;
             const exponent = @divFloor(phi, f);
 
@@ -210,25 +213,33 @@ pub fn bitReverseNumber(number: i64, width: i64) i64 {
 /// The numbers [0, 1, 2, 3] would become [0, 2, 1, 3] because 0 = 0b00 reversed
 /// is 0b00 = 0, 1 = 0b01 reversed is 0b10 = 2, 2 = 0b10 reversed is 0b01 = 1
 /// and 3 = 0b11 reversed is 0b11 = 3.
-/// The caller owns the returned memory.
-pub fn bitReverseSlice(comptime T: type, allocator: Allocator, numbers: []const T) ![]const T {
-    // Length of numbers must be a power of 2.
+/// Note that the slice of numbers is mutated in-place.
+pub fn bitReverseSlice(comptime T: type, comptime n: usize, numbers: []T) ![]T {
+    // Length of numbers must equal n.
+    if (numbers.len != n) {
+        return error.LengthMismatch;
+    }
+    // Length of numbers ower of 2.
     if (!isPowerOfTwo(@intCast(numbers.len))) {
         return error.LengthNotPowerOfTwo;
     }
 
-    const n = numbers.len;
-    const log2_n = std.math.log2_int(usize, @intCast(n));
+    // Create a copy of numbers since direct updates of numbers' index positions
+    // isn't possible.
+    var numbers_copy = [_]T{undefined} ** n;
+    for (0..n) |i| {
+        numbers_copy[i] = numbers[i];
+    }
 
-    const result = try allocator.alloc(T, n);
+    const log2_n = std.math.log2_int(usize, @intCast(n));
 
     for (0..n) |i| {
         const reversed_i = bitReverseNumber(@intCast(i), log2_n);
-        const idx: usize = @intCast(reversed_i);
-        result[i] = numbers[idx];
+        const index: usize = @intCast(reversed_i);
+        numbers[i] = numbers_copy[index];
     }
 
-    return result;
+    return numbers;
 }
 
 test "findRootOfUnity" {
@@ -237,7 +248,7 @@ test "findRootOfUnity" {
         const m = 5;
         const expected = 4;
 
-        const result = try findRootOfUnity(testing.allocator, n, m);
+        const result = try findRootOfUnity(n, m);
         try testing.expectEqual(expected, result);
     }
 
@@ -246,7 +257,7 @@ test "findRootOfUnity" {
         const m = 7;
         const expected = 2;
 
-        const result = try findRootOfUnity(testing.allocator, n, m);
+        const result = try findRootOfUnity(n, m);
         try testing.expectEqual(expected, result);
     }
 
@@ -255,7 +266,7 @@ test "findRootOfUnity" {
         const m = 11;
         const expected = 4;
 
-        const result = try findRootOfUnity(testing.allocator, n, m);
+        const result = try findRootOfUnity(n, m);
         try testing.expectEqual(expected, result);
     }
 
@@ -264,7 +275,7 @@ test "findRootOfUnity" {
         const m: i64 = 11;
 
         const expected = error.InvalidOrder;
-        const result = findRootOfUnity(testing.allocator, n, m);
+        const result = findRootOfUnity(n, m);
 
         try testing.expectError(expected, result);
     }
@@ -274,7 +285,7 @@ test "findRootOfUnity" {
         const m: i64 = 10;
 
         const expected = error.NotPrime;
-        const result = findRootOfUnity(testing.allocator, n, m);
+        const result = findRootOfUnity(n, m);
 
         try testing.expectError(expected, result);
     }
@@ -285,7 +296,7 @@ test "findPrimitiveRoot" {
         const m = 5;
         const expected = 2;
 
-        const result = try findPrimitiveRoot(testing.allocator, m);
+        const result = try findPrimitiveRoot(m);
         try testing.expectEqual(expected, result);
     }
 
@@ -293,7 +304,7 @@ test "findPrimitiveRoot" {
         const m = 7;
         const expected = 3;
 
-        const result = try findPrimitiveRoot(testing.allocator, m);
+        const result = try findPrimitiveRoot(m);
         try testing.expectEqual(expected, result);
     }
 
@@ -301,7 +312,7 @@ test "findPrimitiveRoot" {
         const m = 11;
         const expected = 2;
 
-        const result = try findPrimitiveRoot(testing.allocator, m);
+        const result = try findPrimitiveRoot(m);
         try testing.expectEqual(expected, result);
     }
 
@@ -309,7 +320,7 @@ test "findPrimitiveRoot" {
         const m = 10;
 
         const expected = error.NotPrime;
-        const result = findPrimitiveRoot(testing.allocator, m);
+        const result = findPrimitiveRoot(m);
 
         try testing.expectError(expected, result);
     }
@@ -530,57 +541,76 @@ test "bitReverseNumber" {
 }
 
 test "bitReverseSlice" {
-    const allocator = testing.allocator;
-
     {
-        const input = [_]i64{ 0, 1, 2, 3, 4, 5 };
+        var input = [_]i64{ 0, 1, 2, 3, 4, 5 };
         const expected = error.LengthNotPowerOfTwo;
 
-        const result = bitReverseSlice(i64, allocator, &input);
+        const result = bitReverseSlice(i64, input.len, &input);
         try testing.expectError(expected, result);
     }
 
     {
-        const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7 };
+        var input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7 };
+        const expected = error.LengthMismatch;
+
+        const result = bitReverseSlice(i64, input.len - 1, &input);
+        try testing.expectError(expected, result);
+    }
+
+    {
+        var input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7 };
         const expected = [_]i64{ 0, 4, 2, 6, 1, 5, 3, 7 };
 
-        const result = try bitReverseSlice(i64, allocator, &input);
-        defer allocator.free(result);
+        const result = try bitReverseSlice(i64, input.len, &input);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
 
     {
-        const input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+        var input = [_]i64{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
         const expected = [_]i64{ 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 };
 
-        const result = try bitReverseSlice(i64, allocator, &input);
-        defer allocator.free(result);
+        const result = try bitReverseSlice(i64, input.len, &input);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
 
     {
-        const input = [_]i64{ 0, 1, 4, 5 };
+        var input = [_]i64{ 0, 1, 4, 5 };
         const expected = [_]i64{ 0, 4, 1, 5 };
 
-        const result = try bitReverseSlice(i64, allocator, &input);
-        defer allocator.free(result);
+        const result = try bitReverseSlice(i64, input.len, &input);
 
         try testing.expectEqualSlices(i64, &expected, result);
+    }
+
+    {
+        var input = [_]Complex(f64){
+            Complex(f64).init(0, 0), //
+            Complex(f64).init(1, 0),
+            Complex(f64).init(4, 0),
+            Complex(f64).init(5, 0),
+        };
+        const expected = [_]Complex(f64){
+            Complex(f64).init(0, 0), //
+            Complex(f64).init(4, 0),
+            Complex(f64).init(1, 0),
+            Complex(f64).init(5, 0),
+        };
+
+        const result = try bitReverseSlice(Complex(f64), input.len, &input);
+        try testing.expectEqualSlices(Complex(f64), &expected, result);
     }
 
     {
         const input = [_]i64{ 11, 22, 33, 44, 55, 66, 77, 88 };
         const expected = input;
 
-        const input_1 = input;
-        const result_1 = try bitReverseSlice(i64, allocator, &input_1);
-        defer allocator.free(result_1);
+        var input_1 = input;
+        const result_1 = try bitReverseSlice(i64, input.len, &input_1);
 
         const input_2 = result_1;
-        const result_2 = try bitReverseSlice(i64, allocator, input_2);
-        defer allocator.free(result_2);
+        const result_2 = try bitReverseSlice(i64, input.len, input_2);
 
         try testing.expectEqualSlices(i64, &expected, result_2);
     }
