@@ -1,20 +1,12 @@
-//! By convention, root.zig is the root source file when making a library. If
-//! you are making an executable, the convention is to delete this file and
-//! start with main.zig instead.
+//! This module is the root module which exports functionalities of all other
+//! modules.
+
 const std = @import("std");
 const testing = std.testing;
 
 pub const ntt = @import("ntt.zig");
 pub const fft = @import("fft.zig");
 pub const utils = @import("utils.zig");
-
-pub export fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
-
-test "basic add functionality" {
-    try testing.expect(add(3, 7) == 10);
-}
 
 test {
     @import("std").testing.refAllDecls(@This());
