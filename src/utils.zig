@@ -132,8 +132,9 @@ pub fn pow(a: i64, b: i64, m: i64) !i64 {
     return result;
 }
 
-/// Checks if a given number is (probably) prime using the Miller-Rabin
+/// Checks if a given number is prime using the deterministic Miller-Rabin
 /// primality test algorithm.
+// See: https://cp-algorithms.com/algebra/primality_tests.html#deterministic-version
 pub fn isPrime(number: i64) !bool {
     if (number < 4) {
         return number == 2 or number == 3;
@@ -144,32 +145,35 @@ pub fn isPrime(number: i64) !bool {
         return false;
     }
 
+    var s: i64 = 0;
     var exponent = number - 1;
     while (@mod(exponent, 2) == 0) {
         exponent = @divFloor(exponent, 2);
+        s += 1;
     }
 
-    // See: https://zig.guide/standard-library/random-numbers/
-    var prng = std.Random.DefaultPrng.init(blk: {
-        var seed: u64 = undefined;
-        try std.posix.getrandom(std.mem.asBytes(&seed));
-        break :blk seed;
-    });
-    const rand = prng.random();
+    // First 12 prime bases (necessary to check for 64-bit integers).
+    const bases = [_]i64{ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37 };
 
-    // Perform 1_000 trials.
-    for (0..1_000) |_| {
-        const rand_val: i64 = rand.intRangeAtMost(i64, 1, number - 1);
-        var new_exponent = exponent;
-
-        var power = try pow(rand_val, new_exponent, number);
-
-        while (new_exponent != number - 1 and power != 1 and power != number - 1) {
-            power = @mod((power * power), number);
-            new_exponent *= 2;
+    for (bases) |base| {
+        if (base >= number) {
+            continue;
         }
 
-        if (power != number - 1 and @mod(new_exponent, 2) == 0) {
+        var x = try pow(base, exponent, number);
+
+        if (x == 1 or x == number - 1) {
+            continue;
+        }
+
+        for (0..@intCast(s - 1)) |_| {
+            x = try pow(x, 2, number);
+            if (x == number - 1) {
+                break;
+            }
+        }
+
+        if (x != number - 1) {
             return false;
         }
     }
