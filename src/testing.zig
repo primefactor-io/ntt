@@ -1,3 +1,5 @@
+//! This module implements testing utilities.
+
 const std = @import("std");
 const math = std.math;
 const Complex = math.Complex;

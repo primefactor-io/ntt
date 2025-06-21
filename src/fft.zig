@@ -1,3 +1,6 @@
+//! This module implements functionalities to run Fast Fourier Transform
+//! computations.
+
 const std = @import("std");
 const math = std.math;
 const testing = std.testing;

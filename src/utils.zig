@@ -1,3 +1,5 @@
+//! This module implements utilities necessary to run NTT and FFT computations.
+
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;

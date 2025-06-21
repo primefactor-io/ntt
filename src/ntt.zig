@@ -1,3 +1,6 @@
+//! This module implements functionalities to run Number Theoretic Transform
+//! computations.
+
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
