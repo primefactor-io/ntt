@@ -1,6 +1,6 @@
-# Number Theoretic Transform (NTT)
+# NTT & FFT
 
-Implementation of the [Number Theoretic Transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform_over_a_ring).
+Implementation of the [Number Theoretic Transform (NTT)](https://en.wikipedia.org/wiki/Discrete_Fourier_transform_over_a_ring) and [Fast Fourier Transform (FFT)](https://en.wikipedia.org/wiki/Fast_Fourier_transform) algorithms.
 
 ## Setup
 
@@ -33,6 +33,11 @@ zig run <name>
 - [The Cryptography Caffe - Number Theoretic Transform - Part 2](https://cryptographycaffe.sandboxaq.com/posts/ntt-02)
 - [A Complete Beginner Guide to the Number Theoretic Transform (NTT)](https://eprint.iacr.org/2024/585.pdf)
 - [Implementation of the Number Theoretic Transform](https://ntnuopen.ntnu.no/ntnu-xmlui/bitstream/handle/11250/2778380/no.ntnu%3Ainspera%3A71444464%3A16855169.pdf)
+
+### FFT
+
+- [Introduction to Algorithms - 3rd Edition](https://mitpress.mit.edu/9780262046305/introduction-to-algorithms)
+- [Jeff Erickson - Fast Fourier Transforms](https://jeffe.cs.illinois.edu/teaching/algorithms/notes/A-fft.pdf)
 
 ### Documentation
 
