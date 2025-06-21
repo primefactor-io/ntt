@@ -3,195 +3,160 @@
 
 const std = @import("std");
 const testing = std.testing;
-const Allocator = std.mem.Allocator;
 
 const utils = @import("utils.zig");
 
-/// Instance of a Number Theoretic Transform based on 2n-th root of unity.
+/// Number Theoretic Transform based on the 2n-th root of unity.
 /// This implementation is using the polynomial quotient ring Z_q[x]/(x^n + 1)
 /// where q is the coefficient modulus and n is the degree of the cyclotomic
 /// polynomial.
 /// The NTT algorithm is based on the paper "Low-Cost and Area-Efficient FPGA
 /// Implementations of Lattice-Based Cryptography" by Aysu et al.
 // See: https://schaumont.dyn.wpi.edu/schaum/pdf/papers/2013hostb.pdf
-pub const NTT = struct {
-    const Self = @This();
+pub fn NTT(comptime q: i64, comptime n: i64) type {
+    return struct {
+        const Self = @This();
 
-    /// Coefficient modulus.
-    q: i64,
-    /// Degree of cyclotomic polynomial.
-    n: i64,
-    /// Inverse of degree of cyclotomic polynomial.
-    n_inverse: i64,
-    /// Powers of psi from psi^0 to psi^(n - 1).
-    psi_powers: []i64,
-    /// Powers of psi^-1 = ipsi from ipsi^0 to ipsi^(n - 1).
-    psi_inverse_powers: []i64,
-    /// Allocator used for internal memory allocations.
-    allocator: Allocator,
+        /// Coefficient modulus.
+        comptime q: i64 = q,
+        /// Degree of cyclotomic polynomial.
+        comptime n: i64 = n,
+        /// Inverse of degree of cyclotomic polynomial.
+        n_inverse: i64,
+        /// Powers of psi from psi^0 to psi^(n - 1).
+        psi_powers: [n]i64,
+        /// Powers of psi^-1 = ipsi from ipsi^0 to ipsi^(n - 1).
+        psi_inverse_powers: [n]i64,
 
-    /// Initializes a new NTT instance with the given coefficient modulus and
-    /// cyclotomic polynomial degree (which MUST be a power of 2).
-    pub fn init(allocator: Allocator, q: i64, n: i64) !Self {
-        // Check if degree of cyclotomic polynomial is a power of 2.
-        if (!utils.isPowerOfTwo(n)) {
-            return error.InvalidDegree;
+        /// Initializes a new NTT instance. Ensures that the cyclotomic
+        /// polynomial is a power of 2.
+        pub fn init() !Self {
+            // Check if degree of cyclotomic polynomial is a power of 2.
+            if (!utils.isPowerOfTwo(n)) {
+                return error.InvalidDegree;
+            }
+
+            // Compute psi, the 2n-th root of unity and its inverse.
+            const psi = try utils.findRootOfUnity(2 * n, q);
+            const psi_inverse = try utils.modInv(psi, q);
+
+            // Compute the inverse of the degree of the cyclotomic polynomial.
+            const n_inverse = try utils.modInv(n, q);
+
+            // Compute powers of psi as well as powers of psi^-1.
+            var psi_powers = [_]i64{1} ** n;
+            var psi_inverse_powers = [_]i64{1} ** n;
+
+            for (1..n) |i| {
+                psi_powers[i] = @mod(psi_powers[i - 1] * psi, q);
+                psi_inverse_powers[i] = @mod(psi_inverse_powers[i - 1] * psi_inverse, q);
+            }
+
+            return Self{
+                .n_inverse = n_inverse,
+                .psi_powers = psi_powers,
+                .psi_inverse_powers = psi_inverse_powers,
+            };
         }
 
-        // Compute psi, the 2n-th root of unity and its inverse.
-        const psi = try utils.findRootOfUnity(allocator, 2 * n, q);
-        const psi_inverse = try utils.modInv(psi, q);
+        /// Runs a forward pass of NTT with the given coefficients.
+        /// Note that the slice of coefficients is mutated in-place.
+        pub fn fwd(self: Self, coefficients: []i64) ![]i64 {
+            // Length of coefficients must equal the degree of the cyclotomic polynomial.
+            if (coefficients.len != self.n) {
+                return error.InvalidLength;
+            }
 
-        // Compute the inverse of the degree of the cyclotomic polynomial.
-        const n_inverse = try utils.modInv(n, q);
+            for (0..coefficients.len) |i| {
+                coefficients[i] = @mod(coefficients[i] * self.psi_powers[i], self.q);
+            }
 
-        // Compute powers of psi as well as powers of psi^-1.
-        var powers = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
-        var powers_inverse = try std.ArrayList(i64).initCapacity(allocator, @intCast(n));
-        defer powers.deinit();
-        defer powers_inverse.deinit();
-
-        try powers.append(1);
-        try powers_inverse.append(1);
-
-        for (1..@intCast(n)) |_| {
-            const power = @mod(powers.getLast() * psi, q);
-            const power_inverse = @mod(powers_inverse.getLast() * psi_inverse, q);
-            try powers.append(power);
-            try powers_inverse.append(power_inverse);
+            return self.ntt(coefficients, self.psi_powers);
         }
 
-        const psi_powers = try powers.toOwnedSlice();
-        const psi_inverse_powers = try powers_inverse.toOwnedSlice();
+        /// Runs iNTT (Inverse NTT) with the given coefficients.
+        /// Note that the slice of coefficients is mutated in-place.
+        pub fn inv(self: Self, coefficients: []i64) ![]i64 {
+            // Length of coefficients must equal the degree of the cyclotomic polynomial.
+            if (coefficients.len != self.n) {
+                return error.InvalidLength;
+            }
 
-        return NTT{
-            .q = q,
-            .n = n,
-            .n_inverse = n_inverse,
-            .psi_powers = psi_powers,
-            .psi_inverse_powers = psi_inverse_powers,
-            .allocator = allocator,
-        };
-    }
+            var result = try self.ntt(coefficients, self.psi_inverse_powers);
 
-    /// Release all allocated memory.
-    pub fn deinit(self: Self) void {
-        self.allocator.free(self.psi_powers);
-        self.allocator.free(self.psi_inverse_powers);
-    }
+            for (0..coefficients.len) |i| {
+                result[i] = @mod(result[i] * self.psi_inverse_powers[i] * self.n_inverse, self.q);
+            }
 
-    /// Runs a forward pass of NTT with the given coefficients.
-    /// The caller owns the returned memory.
-    pub fn fwd(self: Self, coefficients: []const i64) ![]const i64 {
-        // Length of coefficients must equal the degree of the cyclotomic polynomial.
-        if (coefficients.len != self.n) {
-            return error.InvalidLength;
+            return result;
         }
 
-        var input = try self.allocator.alloc(i64, coefficients.len);
-        defer self.allocator.free(input);
+        /// Runs an iterative version of NTT with the given coefficients and twiddles
+        /// which are the powers of the roots of unity (i.e. powers of psi / powers
+        /// of psi^-1).
+        /// Note that the slice of coefficients is mutated in-place.
+        fn ntt(self: Self, coefficients: []i64, twiddles: [n]i64) ![]i64 {
+            // Length of coefficients and twiddles must be the same.
+            if (coefficients.len != twiddles.len) {
+                return error.InvalidLength;
+            }
 
-        for (0..coefficients.len) |i| {
-            input[i] = @mod(coefficients[i] * self.psi_powers[i], self.q);
-        }
+            const log2_n = std.math.log2_int(usize, @intCast(self.n));
+            var result = try utils.bitReverseSlice(i64, self.n, coefficients);
 
-        return self.ntt(input, self.psi_powers);
-    }
+            for (0..log2_n) |i| {
+                const in_1 = @as(usize, 1) << @intCast(i); // 2^i
+                const in_2 = @as(usize, 1) << @intCast(i + 1); // 2^(i + 1)
+                const in_3 = @as(usize, @intCast(self.n)) >> @intCast(i + 1); // n >> (i + 1) = n / 2^(i + 1)
 
-    /// Runs INTT (Inverse NTT) with the given coefficients.
-    /// The caller owns the returned memory.
-    pub fn inv(self: Self, coefficients: []const i64) ![]const i64 {
-        // Length of coefficients must equal the degree of the cyclotomic polynomial.
-        if (coefficients.len != self.n) {
-            return error.InvalidLength;
-        }
+                for (0..in_1) |j| {
+                    for (0..in_3) |t| {
+                        const index_even = (t * in_2) + j; // (t * 2^(i + 1)) + j
+                        const index_odd = index_even + in_1; // (t * 2^(i + 1)) + j + 2^i
 
-        const unscaled_result = try self.ntt(coefficients, self.psi_inverse_powers);
-        defer self.allocator.free(unscaled_result);
+                        const c = result[index_even];
+                        const d = result[index_odd];
 
-        var result = try self.allocator.alloc(i64, coefficients.len);
+                        const twiddle_index = @as(usize, j) << @intCast(1 + log2_n - (i + 1)); // j << (1 + log2(n) - (i + 1))
+                        const twiddle_factor = @mod(twiddles[twiddle_index] * d, self.q);
 
-        for (0..coefficients.len) |i| {
-            result[i] = @mod(unscaled_result[i] * self.psi_inverse_powers[i] * self.n_inverse, self.q);
-        }
+                        const butterfly_plus = @mod(c + twiddle_factor, self.q);
+                        const butterfly_minus = @mod(c - twiddle_factor, self.q);
 
-        return result;
-    }
-
-    /// Runs an iterative version of NTT with the given coefficients and twiddles
-    /// which are the powers of the roots of unity (i.e. powers of psi / powers
-    /// of psi^-1).
-    /// The caller owns the returned memory.
-    fn ntt(self: Self, coefficients: []const i64, twiddles: []const i64) ![]const i64 {
-        // Length of coefficients and twiddles must be the same.
-        if (coefficients.len != twiddles.len) {
-            return error.InvalidLength;
-        }
-
-        const log2_n = std.math.log2_int(usize, @intCast(self.n));
-        const reversed = try utils.bitReverseSlice(i64, self.allocator, coefficients);
-        defer self.allocator.free(reversed);
-
-        var result = try self.allocator.dupe(i64, reversed);
-
-        for (0..log2_n) |i| {
-            const in_1 = @as(usize, 1) << @intCast(i); // 2^i
-            const in_2 = @as(usize, 1) << @intCast(i + 1); // 2^(i + 1)
-            const in_3 = @as(usize, @intCast(self.n)) >> @intCast(i + 1); // n >> (i + 1) = n / 2^(i + 1)
-
-            for (0..in_1) |j| {
-                for (0..in_3) |t| {
-                    const index_even = (t * in_2) + j; // (t * 2^(i + 1)) + j
-                    const index_odd = index_even + in_1; // (t * 2^(i + 1)) + j + 2^i
-
-                    const c = result[index_even];
-                    const d = result[index_odd];
-
-                    const twiddle_index = @as(usize, j) << @intCast(1 + log2_n - (i + 1)); // j << (1 + log2(n) - (i + 1))
-                    const twiddle_factor = @mod(twiddles[twiddle_index] * d, self.q);
-
-                    const butterfly_plus = @mod(c + twiddle_factor, self.q);
-                    const butterfly_minus = @mod(c - twiddle_factor, self.q);
-
-                    result[index_even] = butterfly_plus;
-                    result[index_odd] = butterfly_minus;
+                        result[index_even] = butterfly_plus;
+                        result[index_odd] = butterfly_minus;
+                    }
                 }
             }
-        }
 
-        return result;
-    }
-};
+            return result;
+        }
+    };
+}
 
 test "ntt - init" {
-    const allocator = testing.allocator;
-
     {
         const q = 7681;
         const n = 5;
 
         const expected = error.InvalidDegree;
-        const result = NTT.init(allocator, q, n);
+        const result = NTT(q, n).init();
 
         try testing.expectError(expected, result);
     }
 }
 
 test "ntt - fwd" {
-    const allocator = testing.allocator;
-
     {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 1, 2, 3, 4 };
+        var coefficients = [_]i64{ 1, 2, 3, 4 };
         const expected = [_]i64{ 1467, 2807, 3471, 7621 };
 
         const result = try ntt.fwd(&coefficients);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
@@ -200,14 +165,12 @@ test "ntt - fwd" {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 5, 6, 7, 8 };
+        var coefficients = [_]i64{ 5, 6, 7, 8 };
         const expected = [_]i64{ 2489, 7489, 6478, 6607 };
 
         const result = try ntt.fwd(&coefficients);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
@@ -216,10 +179,9 @@ test "ntt - fwd" {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 1, 2, 3 };
+        var coefficients = [_]i64{ 1, 2, 3 };
 
         const expected = error.InvalidLength;
         const result = ntt.fwd(&coefficients);
@@ -229,20 +191,16 @@ test "ntt - fwd" {
 }
 
 test "ntt - inv" {
-    const allocator = testing.allocator;
-
     {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 1467, 2807, 3471, 7621 };
+        var coefficients = [_]i64{ 1467, 2807, 3471, 7621 };
         const expected = [_]i64{ 1, 2, 3, 4 };
 
         const result = try ntt.inv(&coefficients);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
@@ -251,14 +209,12 @@ test "ntt - inv" {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 2489, 7489, 6478, 6607 };
+        var coefficients = [_]i64{ 2489, 7489, 6478, 6607 };
         const expected = [_]i64{ 5, 6, 7, 8 };
 
         const result = try ntt.inv(&coefficients);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
@@ -267,10 +223,9 @@ test "ntt - inv" {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients = [_]i64{ 1, 2, 3 };
+        var coefficients = [_]i64{ 1, 2, 3 };
 
         const expected = error.InvalidLength;
         const result = ntt.inv(&coefficients);
@@ -280,21 +235,17 @@ test "ntt - inv" {
 }
 
 test "ntt - ntt" {
-    const allocator = testing.allocator;
-
     {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
         const twiddles = ntt.psi_powers;
-        const coefficients = [_]i64{ 1, 2, 3, 4 };
+        var coefficients = [_]i64{ 1, 2, 3, 4 };
         const expected = [_]i64{ 10, 913, 7679, 6764 };
 
         const result = try ntt.ntt(&coefficients, twiddles);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
@@ -303,11 +254,10 @@ test "ntt - ntt" {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
         const twiddles = ntt.psi_powers;
-        const coefficients = [_]i64{ 1, 2 };
+        var coefficients = [_]i64{ 1, 2 };
 
         const expected = error.InvalidLength;
         const result = ntt.ntt(&coefficients, twiddles);
@@ -317,17 +267,14 @@ test "ntt - ntt" {
 }
 
 test "ntt - convolution" {
-    const allocator = testing.allocator;
-
     {
         const q = 7681;
         const n = 4;
 
-        const ntt = try NTT.init(allocator, q, n);
-        defer ntt.deinit();
+        const ntt = try NTT(q, n).init();
 
-        const coefficients_1 = [_]i64{ 1, 2, 3, 4 };
-        const coefficients_2 = [_]i64{ 5, 6, 7, 8 };
+        var coefficients_1 = [_]i64{ 1, 2, 3, 4 };
+        var coefficients_2 = [_]i64{ 5, 6, 7, 8 };
         // Note that x^n + 1 = x^4 + 1 which means that x^4 = -1
         //   (1 + 2x + 3x^2 + 4x^3) * (5 + 6x + 7x^2 + 8x^3)
         // = 5 + 6x + 7x^2 + 8x^3 +
@@ -343,8 +290,6 @@ test "ntt - convolution" {
 
         const fwd_1 = try ntt.fwd(&coefficients_1);
         const fwd_2 = try ntt.fwd(&coefficients_2);
-        defer allocator.free(fwd_1);
-        defer allocator.free(fwd_2);
 
         var interim = [_]i64{0} ** n;
         for (0..n) |i| {
@@ -352,7 +297,6 @@ test "ntt - convolution" {
         }
 
         const result = try ntt.inv(&interim);
-        defer allocator.free(result);
 
         try testing.expectEqualSlices(i64, &expected, result);
     }
