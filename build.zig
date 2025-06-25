@@ -42,6 +42,17 @@ pub fn build(b: *std.Build) void {
     // running `zig build`).
     b.installArtifact(lib);
 
+    // Add `check` step for ZLS' Build-On-Save functionality.
+    // See: https://zigtools.org/zls/guides/build-on-save/
+    const lib_check = b.addLibrary(.{
+        .linkage = .static,
+        .name = "ntt",
+        .root_module = lib_mod,
+    });
+
+    const check = b.step("check", "Check if compilation succeeds");
+    check.dependOn(&lib_check.step);
+
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
