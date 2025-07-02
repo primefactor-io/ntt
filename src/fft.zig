@@ -79,6 +79,25 @@ pub fn FFT(comptime n: i64) type {
             return result;
         }
 
+        /// Performs a convolution (polynomial multiplication) with the given
+        /// coefficients.
+        /// Note that all slices are mutated in-place.
+        pub fn convolution(self: Self, result: []Complex(f64), a: []Complex(f64), b: []Complex(f64)) ![]Complex(f64) {
+            // Length of result and coefficients must be the same and equal to n.
+            if (result.len != self.n or a.len != b.len or a.len != self.n) {
+                return error.InvalidLength;
+            }
+
+            const fwd_1 = try self.fwd(a);
+            const fwd_2 = try self.fwd(b);
+
+            for (0..n) |i| {
+                result[i] = fwd_1[i].mul(fwd_2[i]);
+            }
+
+            return self.inv(result);
+        }
+
         /// Runs an iterative version of FFT with the given coefficients and twiddles
         /// which are the powers of the roots of unity (i.e. powers of omega / powers
         /// of omega^-1).
@@ -325,6 +344,41 @@ test "fft - inv" {
     }
 }
 
+test "fft - convolution" {
+    {
+        const n = 4;
+
+        const fft = try FFT(n).init();
+
+        var result = [_]Complex(f64){Complex(f64).init(0, 0)} ** n;
+        var coefficients_1 = [_]Complex(f64){
+            Complex(f64).init(3, 0), //
+            Complex(f64).init(2, 0),
+            Complex(f64).init(0, 0),
+            Complex(f64).init(0, 0),
+        };
+        var coefficients_2 = [_]Complex(f64){
+            Complex(f64).init(1, 0), //
+            Complex(f64).init(5, 0),
+            Complex(f64).init(0, 0),
+            Complex(f64).init(0, 0),
+        };
+
+        //   (3 + 2x + 0x^2 + 0x^3) * (1 + 5x + 0x^2 + 0x^3)
+        // = 3 + 15x + 2x + 10x^2
+        // = 3 + 17x + 10x^2
+        const expected = [_]Complex(f64){
+            Complex(f64).init(3, 0), //
+            Complex(f64).init(17, 0),
+            Complex(f64).init(10, 0),
+            Complex(f64).init(0, 0),
+        };
+        _ = try fft.convolution(&result, &coefficients_1, &coefficients_2);
+
+        try expectEqualComplexSlices(f64, &expected, &result);
+    }
+}
+
 test "fft - fft" {
     {
         const n = 4;
@@ -365,56 +419,5 @@ test "fft - fft" {
         const result = fft.fft(&coefficients, twiddles);
 
         try testing.expectError(expected, result);
-    }
-}
-
-test "fft - convolution" {
-    {
-        const n = 4;
-
-        const fft = try FFT(n).init();
-
-        var coefficients_1 = [_]Complex(f64){
-            Complex(f64).init(3, 0), //
-            Complex(f64).init(2, 0),
-            Complex(f64).init(0, 0),
-            Complex(f64).init(0, 0),
-        };
-        var coefficients_2 = [_]Complex(f64){
-            Complex(f64).init(1, 0), //
-            Complex(f64).init(5, 0),
-            Complex(f64).init(0, 0),
-            Complex(f64).init(0, 0),
-        };
-        //   (3 + 2x + 0x^2 + 0x^3) * (1 + 5x + 0x^2 + 0x^3)
-        // = 3 + 15x + 2x + 10x^2
-        // = 3 + 17x + 10x^2
-        const expected = [_]Complex(f64){
-            Complex(f64).init(3, 0), //
-            Complex(f64).init(17, 0),
-            Complex(f64).init(10, 0),
-            Complex(f64).init(0, 0),
-        };
-
-        const fwd_1 = try fft.fwd(&coefficients_1);
-        const fwd_2 = try fft.fwd(&coefficients_2);
-
-        var interim = [_]Complex(f64){Complex(f64).init(0, 0)} ** n;
-        for (0..n) |i| {
-            interim[i] = fwd_1[i].mul(fwd_2[i]);
-        }
-
-        const result = try fft.inv(&interim);
-
-        try expectEqualComplexSlices(f64, &expected, result);
-
-        // Modify result to turn complex number into integer.
-        const expected_casted = [_]i64{ 3, 17, 10, 0 };
-        var result_casted = [_]i64{0} ** n;
-        for (0..n) |i| {
-            result_casted[i] = @intFromFloat(result[i].re + 0.5);
-        }
-
-        try testing.expectEqualSlices(i64, &expected_casted, &result_casted);
     }
 }

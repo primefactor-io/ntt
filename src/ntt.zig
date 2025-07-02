@@ -91,6 +91,26 @@ pub fn NTT(comptime q: i64, comptime n: i64) type {
             return result;
         }
 
+        /// Performs a convolution (polynomial multiplication) with the given
+        /// coefficients.
+        /// Note that all slices are mutated in-place.
+        pub fn convolution(self: Self, result: []i64, a: []i64, b: []i64) ![]i64 {
+            // Length of result and coefficients must be the same and equal to
+            // the degree of the cyclotomic polynomial.
+            if (result.len != self.n or a.len != b.len or a.len != self.n) {
+                return error.InvalidLength;
+            }
+
+            const fwd_1 = try self.fwd(a);
+            const fwd_2 = try self.fwd(b);
+
+            for (0..n) |i| {
+                result[i] = fwd_1[i] * fwd_2[i];
+            }
+
+            return self.inv(result);
+        }
+
         /// Runs an iterative version of NTT with the given coefficients and twiddles
         /// which are the powers of the roots of unity (i.e. powers of psi / powers
         /// of psi^-1).
@@ -234,6 +254,35 @@ test "ntt - inv" {
     }
 }
 
+test "ntt - convolution" {
+    {
+        const q = 7681;
+        const n = 4;
+
+        const ntt = try NTT(q, n).init();
+
+        var result = [_]i64{0} ** n;
+        var coefficients_1 = [_]i64{ 1, 2, 3, 4 };
+        var coefficients_2 = [_]i64{ 5, 6, 7, 8 };
+
+        // Note that x^n + 1 = x^4 + 1 which means that x^4 = -1
+        //   (1 + 2x + 3x^2 + 4x^3) * (5 + 6x + 7x^2 + 8x^3)
+        // = 5 + 6x + 7x^2 + 8x^3 +
+        //   10x + 12x^2 + 14x^3 + 16x^4 +
+        //   15x^2 + 18x^3 + 21x^4 + 24x^5 +
+        //   20x^3 + 24x^4 + 28x^5 + 32x^6
+        // = 5 + 16x + 34x^2 + 60x^3 + 61x^4 + 52x^5 + 32x^6
+        // = 5 + 16x + 34x^2 + 60x^3 + 61(x^4) + x(52x^4) + x^2(32x^4)
+        // = 5 + 16x + 34x^2 + 60x^3 + (61 * -1) + x(52 * -1) + x^2(32 * -1)
+        // = 5 + 16x + 34x^2 + 60x^3 - 61 - 52x - 32x^2
+        // = -56 - 36x + 2x^2 + 60x^3
+        const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }
+        _ = try ntt.convolution(&result, &coefficients_1, &coefficients_2);
+
+        try testing.expectEqualSlices(i64, &expected, &result);
+    }
+}
+
 test "ntt - ntt" {
     {
         const q = 7681;
@@ -263,41 +312,5 @@ test "ntt - ntt" {
         const result = ntt.ntt(&coefficients, twiddles);
 
         try testing.expectError(expected, result);
-    }
-}
-
-test "ntt - convolution" {
-    {
-        const q = 7681;
-        const n = 4;
-
-        const ntt = try NTT(q, n).init();
-
-        var coefficients_1 = [_]i64{ 1, 2, 3, 4 };
-        var coefficients_2 = [_]i64{ 5, 6, 7, 8 };
-        // Note that x^n + 1 = x^4 + 1 which means that x^4 = -1
-        //   (1 + 2x + 3x^2 + 4x^3) * (5 + 6x + 7x^2 + 8x^3)
-        // = 5 + 6x + 7x^2 + 8x^3 +
-        //   10x + 12x^2 + 14x^3 + 16x^4 +
-        //   15x^2 + 18x^3 + 21x^4 + 24x^5 +
-        //   20x^3 + 24x^4 + 28x^5 + 32x^6
-        // = 5 + 16x + 34x^2 + 60x^3 + 61x^4 + 52x^5 + 32x^6
-        // = 5 + 16x + 34x^2 + 60x^3 + 61(x^4) + x(52x^4) + x^2(32x^4)
-        // = 5 + 16x + 34x^2 + 60x^3 + (61 * -1) + x(52 * -1) + x^2(32 * -1)
-        // = 5 + 16x + 34x^2 + 60x^3 - 61 - 52x - 32x^2
-        // = -56 - 36x + 2x^2 + 60x^3
-        const expected = [_]i64{ 7625, 7645, 2, 60 }; // = { -56, -36, 2, 60 }
-
-        const fwd_1 = try ntt.fwd(&coefficients_1);
-        const fwd_2 = try ntt.fwd(&coefficients_2);
-
-        var interim = [_]i64{0} ** n;
-        for (0..n) |i| {
-            interim[i] = fwd_1[i] * fwd_2[i];
-        }
-
-        const result = try ntt.inv(&interim);
-
-        try testing.expectEqualSlices(i64, &expected, result);
     }
 }
