@@ -39,6 +39,15 @@ zig run <name>
 - [Introduction to Algorithms - 3rd Edition](https://mitpress.mit.edu/9780262046305/introduction-to-algorithms)
 - [Jeff Erickson - Fast Fourier Transforms](https://jeffe.cs.illinois.edu/teaching/algorithms/notes/A-fft.pdf)
 
+### WebGPU
+
+- [WebGPU Rocks](https://webgpu.rocks)
+- [WebGPU Best Practices](https://toji.dev/webgpu-best-practices)
+- [WebGPU Fundamentals](https://webgpufundamentals.org)
+- [WebGPU C++ Guide](https://eliemichel.github.io/LearnWebGPU)
+- [WebGPU Unleashed: A Practical Tutorial](https://shi-yan.github.io/webgpuunleashed)
+- [WebGPU - All of the cores, none of the canvas](https://surma.dev/things/webgpu)
+
 ### Documentation
 
 - [Zig Documentation](https://ziglang.org/documentation/0.14.0)

@@ -3,12 +3,36 @@ const std = @import("std");
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+
+    // Determine Operating System.
+    const os = switch (target.result.os.tag) {
+        .linux => "linux",
+        .macos => "macos",
+        .windows => "windows",
+        else => null,
+    };
+
+    // Determine CPU Architecture.
+    const arch = switch (target.result.cpu.arch) {
+        .x86_64 => "x86_64",
+        .aarch64 => "aarch64",
+        else => null,
+    };
+
+    // Exit early if system isn't supported.
+    if (os == null or arch == null) {
+        return error.UnsupportedSystem;
+    }
+
+    // WebGPU paths.
+    const wgpuIncludePath = b.fmt("{s}", .{"webgpu/include"});
+    const wgpuLibraryPath = b.fmt("webgpu/bin/{s}-{s}", .{ os.?, arch.? });
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
@@ -37,6 +61,10 @@ pub fn build(b: *std.Build) void {
         .root_module = lib_mod,
     });
 
+    lib.addIncludePath(b.path(wgpuIncludePath));
+    lib.addLibraryPath(b.path(wgpuLibraryPath));
+    lib.linkSystemLibrary("wgpu_native");
+
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
@@ -49,6 +77,10 @@ pub fn build(b: *std.Build) void {
         .name = "ntt",
         .root_module = lib_mod,
     });
+
+    lib_check.addIncludePath(b.path(wgpuIncludePath));
+    lib_check.addLibraryPath(b.path(wgpuLibraryPath));
+    lib_check.linkSystemLibrary("wgpu_native");
 
     const check = b.step("check", "Check if compilation succeeds");
     check.dependOn(&lib_check.step);
